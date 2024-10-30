@@ -16,22 +16,26 @@
     var item;
     while (item = Zotero.nextItem()) {
       // ref
-      Zotero.write('- ' + item.title + ' #publication\n');
+      Zotero.write('- ' + item.title + ' #source\n');
   
       // author
-      Zotero.write('  - Authored by:: \n');
+      Zotero.write('  - Authors:: \n');
       // write authors as indented nodes
       for (author in item.creators){
         Zotero.write('    - [[' + (item.creators[author].firstName||'') + ' ' + (item.creators[author].lastName||'') + ']]\n');
       }
       Zotero.write('\n');
    
-      // year
+      // date
       var date = Zotero.Utilities.strToDate(item.date);
-      var dateS = (date.year) ? date.year : item.date;   
-      Zotero.write('  - Year:: ')
-      Zotero.write((dateS||'') + '\n')
-      
+      var dateString = '[[date:';
+      if (date.year) dateString += String(date.year).padStart(4, '0');
+      if (date.month) dateString += ('-' + String(date.month + 1).padStart(2, '0'));
+      if (date.day) dateString += ('-' + String(date.day).padStart(2, '0'));
+      dateString += ']]';
+      if (dateString === "[[date:]]") dateString = '';
+      Zotero.write('  - Date:: ' + dateString + '\n');
+
       // publication
       Zotero.write('  - Publication:: ')
       Zotero.write((item.publicationTitle ||'')+ '\n')
@@ -40,13 +44,16 @@
       var library_id = item.libraryID ? item.libraryID : 0;  
       var itemLink = 'zotero://select/items/' + library_id + '_' + item.key;
    
-      Zotero.write('  - Zotero link:: ')
-      Zotero.write('[Zotero Link](' + itemLink + ')\n')
+      Zotero.write('  - Zotero link:: ');
+      Zotero.write('[Zotero Link](' + itemLink + ')\n');
    
       // url with citation
-      Zotero.write('  - URL:: ' + (item.url||'') + '\n')
+      Zotero.write('  - URL:: ' + (item.url||'') + '\n');
+
+      // status
+      Zotero.write('  - Status:: Unread\n');
       
-      Zotero.write('  - Abstract:: '+  (item.abstractNote || '')+ '\n')
+      // Zotero.write('  - Abstract:: '+  (item.abstractNote || '')+ '\n')
     }
   }
   
