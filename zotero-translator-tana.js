@@ -16,37 +16,53 @@
     var item;
     while (item = Zotero.nextItem()) {
       // ref
-      Zotero.write('- ' + item.title + ' #publication\n');
-  
+      Zotero.write('- ' + item.title + ' #source\n');
+
+
+      // status (defaults to "Unread")
+      Zotero.write('  - Status:: Unread\n');
+
+      // library (defaults to "CDPR")
+      Zotero.write('  - Library:: \n')
+
+      // date
+      var date = Zotero.Utilities.strToDate(item.date);
+      var dateString = '[[date:';
+      if (date.year) dateString += String(date.year).padStart(4, '0');
+      if (date.month) dateString += ('-' + String(date.month + 1).padStart(2, '0'));
+      if (date.day) dateString += ('-' + String(date.day).padStart(2, '0'));
+      dateString += ']]';
+      if (dateString === "[[date:]]") dateString = '';
+      Zotero.write('  - Date:: ' + dateString + '\n');
+
       // author
-      Zotero.write('  - Authored by:: \n');
+      Zotero.write('  - Creator:: \n');
       // write authors as indented nodes
       for (author in item.creators){
         Zotero.write('    - [[' + (item.creators[author].firstName||'') + ' ' + (item.creators[author].lastName||'') + ']]\n');
       }
       Zotero.write('\n');
    
-      // year
-      var date = Zotero.Utilities.strToDate(item.date);
-      var dateS = (date.year) ? date.year : item.date;   
-      Zotero.write('  - Year:: ')
-      Zotero.write((dateS||'') + '\n')
-      
       // publication
       Zotero.write('  - Publication:: ')
       Zotero.write((item.publicationTitle ||'')+ '\n')
-   
-      // zotero link
-      var library_id = item.libraryID ? item.libraryID : 0;  
-      var itemLink = 'zotero://select/items/' + library_id + '_' + item.key;
-   
-      Zotero.write('  - Zotero link:: ')
-      Zotero.write('[Zotero Link](' + itemLink + ')\n')
-   
+
       // url with citation
-      Zotero.write('  - URL:: ' + (item.url||'') + '\n')
-      
-      Zotero.write('  - Abstract:: '+  (item.abstractNote || '')+ '\n')
+      Zotero.write('  - URL:: ' + (item.url||'') + '\n');
+      // Zotero.write('  - URL:: ');
+      // if (item.url) Zotero.write('[' + item.url + '](' + item.url + ')');
+      // Zotero.write('\n')
+
+      // zotero link
+      var library_id = item.libraryID ? item.libraryID : 0;
+      var itemLink = 'zotero://select/items/' + library_id + '_' + item.key;
+      Zotero.write('  - Zotero item:: ' + itemLink + '\n');
+      // Zotero.write('  - Zotero link:: ');
+      // Zotero.write('[' + itemLink + '](' + itemLink + ')\n');
+
+      // abstracts for e.g. math articles on Wikipedia need to be sanitized, or
+      // they don't render correctly in Tana
+      // Zotero.write('  - Abstract:: '+  (item.abstractNote || '')+ '\n')
     }
   }
   
