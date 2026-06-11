@@ -8,54 +8,115 @@
   "maxVersion":"",
   "priority":200,
   "inRepository":false,
-  "lastUpdated":"2022-09-07 - 10:15"
+  "lastUpdated":"2026-06-11 - 08:30"
+  }
+
+  // Maps each supported Zotero item type to its Tana supertag (all extend
+  // #zotero in the Tana schema) and the type-specific source fields for the
+  // shared Publication / Publisher / Identifier fields. Items whose type is
+  // not listed here are skipped entirely.
+  //
+  // creatorRoles defaults to ['author']. editorFallback uses editors only
+  // when an item has no authors (edited volumes).
+  var TYPE_CONFIG = {
+    blogPost:         { tag: 'blog-post',         publication: ['blogTitle'] },
+    book:             { tag: 'book',              publisher: ['publisher'], identifier: ['ISBN'], editorFallback: true },
+    bookSection:      { tag: 'book-section',      publication: ['bookTitle'], publisher: ['publisher'], identifier: ['ISBN'], editorFallback: true },
+    case:             { tag: 'case',              publication: ['reporter'], identifier: ['docketNumber'] },
+    conferencePaper:  { tag: 'conference-paper',  publication: ['proceedingsTitle', 'conferenceName'], publisher: ['publisher'] },
+    document:         { tag: 'document',          publisher: ['publisher'] },
+    forumPost:        { tag: 'forum-post',        publication: ['forumTitle'] },
+    journalArticle:   { tag: 'journal-article',   publication: ['publicationTitle'] },
+    manuscript:       { tag: 'manuscript',        publisher: ['institution'], identifier: ['number'] },
+    newspaperArticle: { tag: 'newspaper-article', publication: ['publicationTitle'], publisher: ['publisher'] },
+    podcast:          { tag: 'podcast',           publication: ['seriesTitle'], publisher: ['publisher'], identifier: ['episodeNumber'], creatorRoles: ['podcaster', 'guest'] },
+    presentation:     { tag: 'presentation',      publication: ['meetingName'], creatorRoles: ['presenter'] },
+    report:           { tag: 'report',            publication: ['seriesTitle'], publisher: ['institution'], identifier: ['reportNumber'] },
+    statute:          { tag: 'statute',           publication: ['code'], identifier: ['publicLawNumber'] },
+    webpage:          { tag: 'webpage',           publication: ['websiteTitle'], publisher: ['publisher'] }
+  };
+
+  function firstValue(item, fields) {
+    if (!fields) return '';
+    for (var i = 0; i < fields.length; i++) {
+      if (item[fields[i]]) return item[fields[i]];
+    }
+    return '';
+  }
+
+  function pickCreators(item, config) {
+    var creators = item.creators || [];
+    var roles = config.creatorRoles || ['author'];
+    var picked = creators.filter(function (c) {
+      return roles.indexOf(c.creatorType) !== -1;
+    });
+    if (!picked.length && config.editorFallback) {
+      picked = creators.filter(function (c) {
+        return c.creatorType === 'editor';
+      });
+    }
+    return picked;
+  }
+
+  function creatorName(creator) {
+    if (creator.name) return creator.name; // institutional/single-field names
+    return ((creator.firstName || '') + ' ' + (creator.lastName || '')).trim();
+  }
+
+  function tanaDate(raw) {
+    if (!raw) return '';
+    var date = Zotero.Utilities.strToDate(raw);
+    var s = '';
+    // month is 0-indexed, so test against undefined or January is dropped
+    if (date.year) s += String(date.year).padStart(4, '0');
+    if (s && date.month !== undefined) s += '-' + String(date.month + 1).padStart(2, '0');
+    if (s && date.day) s += '-' + String(date.day).padStart(2, '0');
+    return s ? '[[date:' + s + ']]' : '';
   }
 
   function doExport() {
     Zotero.write('%%tana%%\n');
     var item;
     while (item = Zotero.nextItem()) {
-      // title (node name)
-      Zotero.write('- ' + item.title + ' #zotero-item\n');
+      var config = TYPE_CONFIG[item.itemType];
+      if (!config) continue;
 
-      // status (defaults to "Unread")
-      Zotero.write('  - Status:: Unread\n');
+      // case and statute name their title field differently
+      var title = item.title || item.caseName || item.nameOfAct || 'Untitled';
+      Zotero.write('- ' + title + ' #' + config.tag + '\n');
 
-      // library (defaults to "CDPR")
-      //Zotero.write('  - Library:: \n')
+      // No Status line: the field's default ("Inbox") materializes when the
+      // tag is applied. Pasting an explicit Status:: collides with that
+      // default-created instance in the app and spawns a duplicate field.
 
-      // date
-      var date = Zotero.Utilities.strToDate(item.date);
-      var dateString = '[[date:';
-      if (date.year) dateString += String(date.year).padStart(4, '0');
-      if (date.month) dateString += ('-' + String(date.month + 1).padStart(2, '0'));
-      if (date.day) dateString += ('-' + String(date.day).padStart(2, '0'));
-      dateString += ']]';
-      if (dateString === "[[date:]]") dateString = '';
-      Zotero.write('  - Date:: ' + dateString + '\n');
+      var libraryID = item.libraryID ? item.libraryID : 0;
+      Zotero.write('  - Item:: [Open in Zotero](zotero://select/items/' + libraryID + '_' + item.key + ')\n');
 
-      // creator
-      Zotero.write('  - Creator:: \n');
-      // write authors as indented nodes
-      for (author in item.creators){
-        Zotero.write('    - [[' + (item.creators[author].firstName||'') + ' ' + (item.creators[author].lastName||'') + ' #person]]\n');
+      var creators = pickCreators(item, config);
+      if (creators.length) {
+        Zotero.write('  - Creator::\n');
+        for (var i = 0; i < creators.length; i++) {
+          Zotero.write('    - [[' + creatorName(creators[i]) + ' #Person]]\n');
+        }
       }
-      Zotero.write('\n');
 
-      // publication
-      // Zotero.write('  - Publication:: ')
-      // Zotero.write((item.publicationTitle ||'')+ '\n')
+      var dateString = tanaDate(item.date || item.dateDecided || item.dateEnacted);
+      if (dateString) Zotero.write('  - Date:: ' + dateString + '\n');
 
-      // url with citation
-      // Zotero.write('  - URL:: ' + (item.url||'') + '\n');
+      if (item.url) Zotero.write('  - Link:: ' + item.url + '\n');
 
-      // zotero link
-      var library_id = item.libraryID ? item.libraryID : 0;
-      var itemLink = 'zotero://select/items/' + library_id + '_' + item.key;
-      Zotero.write('  - Item::' + itemLink + '\n');
+      var publication = firstValue(item, config.publication);
+      if (publication) Zotero.write('  - Publication:: ' + publication + '\n');
 
-      // abstracts for e.g. math articles on Wikipedia need to be sanitized, or
-      // they don't render correctly in Tana
-      // Zotero.write('  - Abstract:: '+  (item.abstractNote || '')+ '\n')
+      var publisher = firstValue(item, config.publisher);
+      if (publisher) Zotero.write('  - Publisher:: ' + publisher + '\n');
+
+      // every type falls back to DOI, which Zotero allows on all items
+      var identifier = firstValue(item, config.identifier) || item.DOI;
+      if (identifier) Zotero.write('  - Identifier:: ' + identifier + '\n');
+
+      if (item.itemType === 'case' && item.court) {
+        Zotero.write('  - Court:: ' + item.court + '\n');
+      }
     }
   }
